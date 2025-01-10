@@ -5,6 +5,7 @@ import dotenv
 import requests
 import google.generativeai as genai
 from requests_oauthlib import OAuth1
+from agent_utils import get_last_n_tweets, add_tweet_to_db
 
 
 dotenv.load_dotenv(override=True)
@@ -17,6 +18,12 @@ def generate_post(agent_name):
     prompt_path = os.path.join(agent_name, "prompt.txt")
     with open(prompt_path, "r") as f:
         prompt = f.read()
+
+    tweets = get_last_n_tweets(agent_name, 5)
+    for tweet in tweets:
+        prompt += f"\n{tweet}"
+
+    print("prompting model with:", prompt)
 
     response = model.generate_content(prompt).text
     response = response.replace("\n", " ")
@@ -34,15 +41,21 @@ def generate_post(agent_name):
 
 
 def validate_post(post):
+    print("generated post:\n", post)
+
     if len(post) > 280:
-        print(f"Post is too long: {len(post)} chars.")
-        return False
+        print(f"Post is too long: {len(post)} chars. Trimming.")
+        # find the last period before 280 chars and trim everything after it.
+        post = post[:280]
+        post = post[: post.rfind(".") + 1]
+        print("trimmed post:\n", post)
+
     if len(post) < 8:
         print(f"Post is too short: {len(post)} chars.")
         return False
-    print("generated post:\n", post)
-    yesno = input("type 'post' to post to x: ")
-    return yesno == "post"
+
+    yesno = input("type 'yes' to post to x: ")
+    return yesno == "yes"
 
 
 def ship_post(post):
@@ -87,10 +100,11 @@ def main():
     if validate_post(post):
         print("validated post")
         ship_post(post)
-        exit(0)
     else:
         print("failed to validate post, not posting")
-        exit(0)
+    save = input("add post to db? ")
+    if save == "yes":
+        add_tweet_to_db(agent_name, post)
 
 
 if __name__ == "__main__":
