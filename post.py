@@ -1,3 +1,8 @@
+"""
+Contains all the logic to actually create/validate and post a tweet. 
+Calling main() or running this file will walk through the posting process.
+"""
+
 import os
 import sys
 import time
@@ -5,7 +10,7 @@ import dotenv
 import requests
 import google.generativeai as genai
 from requests_oauthlib import OAuth1
-from agent_utils import get_last_n_tweets, add_tweet_to_db
+from agent_utils import get_last_n_tweets, add_tweet_to_db, tweet_similarity
 
 
 dotenv.load_dotenv(override=True)
@@ -40,7 +45,7 @@ def generate_post(agent_name):
     return response
 
 
-def validate_post(post):
+def validate_post(post, agent_name):
     print("generated post:\n", post)
 
     if len(post) > 280:
@@ -52,6 +57,12 @@ def validate_post(post):
 
     if len(post) < 8:
         print(f"Post is too short: {len(post)} chars.")
+        return False
+
+    sim = tweet_similarity(post, agent_name)
+    print("measured a similarity of:", sim)
+    if sim > 0.4:
+        print("Post is too similar to previous tweets.")
         return False
 
     yesno = input("type 'yes' to post to x: ")
@@ -97,7 +108,7 @@ def main():
 
     agent_name = sys.argv[1]
     post = generate_post(agent_name)
-    if validate_post(post):
+    if validate_post(post, agent_name):
         print("validated post")
         ship_post(post)
     else:
